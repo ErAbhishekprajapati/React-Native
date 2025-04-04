@@ -445,3 +445,216 @@ export default function App() {
     </NavigationContainer>
   );
 }
+
+// app dev news  api 
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, Text, View, FlatList, Image, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import axios from 'axios';
+
+// Note: In a real app, these should come from environment variables or a config service
+const API_KEYS = {
+  news: 'pub_78243ec41da181c97c66fbad5bf421f20138d',
+  weather: 'd4c8088e25469279f51afae0e7304bd8'
+};
+
+const NewsApp = () => {
+  const [news, setNews] = useState([]);
+  const [weather, setWeather] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      await Promise.all([fetchNews(), fetchWeather()]);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setError('Failed to load data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchNews = async () => {
+    try {
+      const response = await axios.get('https://newsdata.io/api/1/news', {
+        params: {
+          country: 'in',
+          apikey: API_KEYS.news,
+          q: 'uttar pradesh',
+          language: 'en,hi',
+          category: 'education',
+        },
+      });
+      setNews(response.data.results || []);
+    } catch (error) {
+      console.error('News API Error:', error);
+      throw new Error('News fetch failed');
+    }
+  };
+
+  const fetchWeather = async () => {
+    try {
+      const response = await axios.get('https://api.openweathermap.org/data/2.5/weather', {
+        params: {
+          q: 'Delhi',
+          appid: API_KEYS.weather,
+          units: 'metric',
+        },
+      });
+      setWeather(response.data);
+    } catch (error) {
+      console.error('Weather API Error:', error);
+      throw new Error('Weather fetch failed');
+    }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchData().finally(() => setRefreshing(false));
+  };
+
+  const renderItem = ({ item }) => (
+    <TouchableOpacity onPress={() => alert(item.title)}>
+      <View style={styles.card}>
+        {item.image_url && (
+          <Image 
+            source={{ uri: item.image_url }} 
+            style={styles.image}
+            resizeMode="cover"
+          />
+        )}
+        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.description}>{item.description || 'No description available'}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.error}>{error}</Text>
+        <TouchableOpacity onPress={fetchData} style={styles.retryButton}>
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.heading}>Latest News</Text>
+      
+      <FlatList
+        data={news}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.article_id || item.url}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={handleRefresh} 
+          />
+        }
+        ListFooterComponent={
+          weather && (
+            <View style={styles.weatherContainer}>
+              <Text style={styles.weatherHeading}>Current Weather</Text>
+              <Text style={styles.weatherText}>City: {weather.name}</Text>
+              <Text style={styles.weatherText}>Temperature: {weather.main.temp}°C</Text>
+              <Text style={styles.weatherText}>Weather: {weather.weather[0].description}</Text>
+              <Text style={styles.weatherText}>Humidity: {weather.main.humidity}%</Text>
+            </View>
+          )
+        }
+      />
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 10,
+    backgroundColor: '#f5f5f5',
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heading: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  card: {
+    backgroundColor: '#fff',
+    padding: 15,
+    marginVertical: 8,
+    borderRadius: 8,
+    elevation: 2,
+  },
+  image: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  description: {
+    fontSize: 14,
+    color: '#666',
+  },
+  error: {
+    color: 'red',
+    fontSize: 16,
+    marginBottom: 20,
+  },
+  retryButton: {
+    padding: 10,
+    backgroundColor: '#007AFF',
+    borderRadius: 5,
+  },
+  retryText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  weatherContainer: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    elevation: 2,
+  },
+  weatherHeading: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  weatherText: {
+    fontSize: 16,
+    marginBottom: 5,
+  },
+});
+
+export default NewsApp;
